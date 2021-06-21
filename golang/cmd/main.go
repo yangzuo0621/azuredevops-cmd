@@ -2,16 +2,16 @@ package main
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
-	"log"
 
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/microsoft/azure-devops-go-api/azuredevops"
-	"github.com/microsoft/azure-devops-go-api/azuredevops/git"
+	vstsrelease "github.com/microsoft/azure-devops-go-api/azuredevops/release"
+	"github.com/sirupsen/logrus"
 )
 
 func main() {
+	logger := logrus.New()
+	logger.SetLevel(logrus.DebugLevel)
 	organizationUrl := "https://dev.azure.com/msazure"
 	personalAccessToken := ""
 
@@ -20,108 +20,59 @@ func main() {
 
 	ctx := context.Background()
 
-	// Create a client to interact with the Core area
-	gitClient, err := git.NewClient(ctx, connection)
+	releasClient, err := vstsrelease.NewClient(ctx, connection)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatalln(err)
 	}
 
-	result, err := gitClient.CreateAnnotatedTag(ctx, git.CreateAnnotatedTagArgs{
-		RepositoryId: to.StringPtr("aks-rp"),
-		Project:      to.StringPtr("CloudNativeCompute"),
-		TagObject: &git.GitAnnotatedTag{
-			Message: to.StringPtr("Test Tags 101..."),
-			Name:    to.StringPtr("cicd.20210415.101"),
-			TaggedObject: &git.GitObject{
-				ObjectId: to.StringPtr("51052aa561317ef86271eae9ed84af3ea256d19d"),
+	for _, id := range []int{617, 618, 619} {
+		release, err := releasClient.CreateRelease(ctx, vstsrelease.CreateReleaseArgs{
+			Project: to.StringPtr("CloudNativeCompute"),
+			ReleaseStartMetadata: &vstsrelease.ReleaseStartMetadata{
+				DefinitionId: &id,
+				Description:  to.StringPtr("Official Release 2021/06/10"),
+				Artifacts: &[]vstsrelease.ArtifactMetadata{
+					{
+						Alias: to.StringPtr("drop_root"),
+						InstanceReference: &vstsrelease.BuildVersion{
+							Id:   to.StringPtr("43626541"),
+							Name: to.StringPtr("v20210610.210616.3"),
+						},
+					},
+				},
 			},
-		},
-	})
-
-	// result, err := gitClient.GetRefs(ctx, git.GetRefsArgs{
-	// 	RepositoryId:   to.StringPtr("aks-rp"),
-	// 	Project:        to.StringPtr("CloudNativeCompute"),
-	// 	Filter:         to.StringPtr("tags"),
-	// 	FilterContains: to.StringPtr("cicd.20210414.5"),
-	// })
-
-	if err != nil {
-		panic(err)
+		})
+		if err != nil {
+			logger.Warnln(err)
+		} else {
+			logger.Infof("%d %s %s\n", *release.Id, *release.Name)
+		}
 	}
 
-	contents, _ := json.MarshalIndent(result, "", "  ")
-	fmt.Println(string(contents))
+	// client, err := build.NewClient(ctx, connection)
+	// if err != nil {
+	// 	logger.Fatalln(err)
+	// }
 
-	// _, err = gitClient.UpdateRefs(ctx, git.UpdateRefsArgs{
-	// 	Project:      to.StringPtr("CloudNativeCompute"),
-	// 	RepositoryId: to.StringPtr("aks-rp"),
-	// 	RepositoryId: to.StringPtr("45442779-e72f-4447-9cd5-d3d2e2329e6e"),
-	// 	RefUpdates: &[]git.GitRefUpdate{
-	// 		{
-	// 			OldObjectId: to.StringPtr("0000000000000000000000000000000000000000"),
-	// 			NewObjectId: to.StringPtr("c0ad9cb0917161a26bb5e6ef710a7ee839970b38"),
-	// 			Name:        to.StringPtr("refs/heads/zuya/test111"),
+	// m := make(map[string]string)
+	// content, _ := json.Marshal(m)
+	// contentStr := string(content)
+	// b, err := client.QueueBuild(ctx, build.QueueBuildArgs{
+	// 	Build: &build.Build{
+	// 		Definition: &build.DefinitionReference{
+	// 			Id: to.IntPtr(200226),
 	// 		},
+	// 		SourceBranch: to.StringPtr("refs/heads/official/v20210610"),
+	// 		Parameters:   &contentStr,
 	// 	},
-	// })
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// "c0ad9cb0917161a26bb5e6ef710a7ee839970b38"
-
-	// diff, err := gitClient.GetCommitDiffs(ctx, git.GetCommitDiffsArgs{
-	// 	Project:      to.StringPtr("CloudNativeCompute"),
-	// 	RepositoryId: to.StringPtr("aks-rp"),
-	// 	BaseVersionDescriptor: &git.GitBaseVersionDescriptor{
-	// 		BaseVersion:     to.StringPtr("dab1bb614a735f5e50c9e36d6fff42cd10efef3f"),
-	// 		BaseVersionType: &git.GitVersionTypeValues.Commit,
-	// 	},
-	// 	TargetVersionDescriptor: &git.GitTargetVersionDescriptor{
-	// 		TargetVersion:     to.StringPtr("b73408a5f5b7c5ef657e9929664d565ca6fe4a30"),
-	// 		TargetVersionType: &git.GitVersionTypeValues.Commit,
-	// 	},
-	// })
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-
-	// contents, err := json.MarshalIndent(diff, "", "  ")
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// log.Print(string(contents))
-
-	// commits, err := gitClient.GetCommits(ctx, git.GetCommitsArgs{
-	// 	Project:      to.StringPtr("CloudNativeCompute"),
-	// 	RepositoryId: to.StringPtr("aks-rp"),
-	// 	SearchCriteria: &git.GitQueryCommitsCriteria{
-	// 		CompareVersion: &git.GitVersionDescriptor{
-	// 			VersionType: &git.GitVersionTypeValues.Commit,
-	// 			Version:     to.StringPtr("dab1bb614a735f5e50c9e36d6fff42cd10efef3f"),
-	// 		},
-	// 		ItemVersion: &git.GitVersionDescriptor{
-	// 			Version:        to.StringPtr("f0c5e291b35cb06030ae400d41bf6e8ae3d83604"),
-	// 			VersionType:    &git.GitVersionTypeValues.Commit,
-	// 			VersionOptions: &git.GitVersionOptionsValues.FirstParent,
-	// 		},
-	// 	},
+	// 	Project: to.StringPtr("CloudNativeCompute"),
 	// })
 
 	// if err != nil {
-	// 	log.Fatal(err)
+	// 	logger.Fatalln(err)
 	// }
 
-	// for _, c := range *commits {
-	// 	log.Printf("%s %s", *c.CommitId, *c.Comment)
-	// }
-
-	// log.Print(len(*commits))
-
-	// commit, err := gitClient.GetCommit(ctx, git.GetCommitArgs{
-	// 	CommitId:     to.StringPtr("f0c5e291b35cb06030ae400d41bf6e8ae3d83604"),
-	// 	Project:      to.StringPtr("CloudNativeCompute"),
-	// 	RepositoryId: to.StringPtr("aks-rp"),
-	// })
-	// log.Printf("%s %s", *commit.CommitId, *commit.Comment)
-
+	// logger.Infof("%s", b.BuildNumber)
+	// logger.Infof("%s", b.BuildNumberRevision)
+	// logger.Infof("%d", b.Id)
 }
